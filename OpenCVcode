@@ -1,0 +1,146 @@
+#include "opencv2/opencv.hpp"  // includes open cv data files
+#include "opencv2/imgproc.hpp"
+#include <windows.h>// seleep function delay function
+#include <iostream>
+using namespace std;
+using namespace cv;
+// Function headers
+int processImgR(Mat);
+int processImgG(Mat);
+bool isIntersected(Rect, Rect);
+// Global variables
+bool isFirstDetectedR = true;
+bool isFirstDetectedG = true;
+Rect* lastTrackBoxR;// 2-d datatype
+Rect* lastTrackBoxG;
+int lastTrackNumR;
+int lastTrackNumG;
+int main()
+{	int redCount = 0;
+	int greenCount = 0;
+	Mat frame;Mat img;Mat imgYCrCb;Mat imgGreen;Mat imgRed;
+	// Parameters of brightness
+	double a = 0.3; // gain, modify this only.
+	double b = (1 - a) * 125; // bias
+	VideoCapture capture("D:/Asheesh/Documents/Visual Studio 2015/Projects/ConsoleApplication5/TEST1.mp4");// input file
+	if (!capture.isOpened())
+	{
+		cout << "Start device failed!\n" << endl;
+		return -1;
+	}
+	while (1)
+	{
+		capture >> frame;// divides video to picture per frame
+		// Adjust the brightness
+		frame.convertTo(img, img.type(), a, b);
+		// Convert to YCrCb color space or colour module ,,,,consist all colour
+		cvtColor(img, imgYCrCb, CV_BGR2YCrCb);// (from,to,color module command)
+		imgRed.create(imgYCrCb.rows, imgYCrCb.cols, CV_8UC1);// 8 bits unsigned char to 1 channel
+		imgGreen.create(imgYCrCb.rows, imgYCrCb.cols, CV_8UC1);
+		// Split three components of YCrCb
+		vector<Mat> planes;//infinite list of matrices
+		split(imgYCrCb, planes);// y,cr,cb divides iinto 3 different matrices
+		// Traversing to split the color of RED and GREEN according to the Cr component
+		MatIterator_<uchar> it_Cr = planes[1].begin<uchar>(),              // stores plane starting point into it_Cr in uchar format
+			it_Cr_end = planes[1].end<uchar>();                         //stores plane ending point into it_Cr_end in uchar format
+		MatIterator_<uchar> it_Red = imgRed.begin<uchar>();                    //  saves copy of file for red comparion
+		MatIterator_<uchar> it_Green = imgGreen.begin<uchar>();                   // saves copy of file for green comparison
+		for (; it_Cr != it_Cr_end; ++it_Cr, ++it_Red, ++it_Green) // loop for determining red points and green points or area
+		{// RED, 145<Cr<470 
+			if (*it_Cr > 145 && *it_Cr < 470)
+				*it_Red = 255;  // saves red spots as white
+			else
+				*it_Red = 0;// saves spot other than red as black
+			// GREEN£¬95<Cr<110
+			if (*it_Cr > 95 && *it_Cr < 110)
+				*it_Green = 255;
+			else
+				*it_Green = 0;
+		}
+		//Expansion and corrosion  
+		dilate(imgRed, imgRed, Mat(15, 15, CV_8UC1), Point(-1, -1));//HIT              
+		erode(imgRed, imgRed, Mat(1, 1, CV_8UC1), Point(-1, -1));//FIT                 //image enhancement
+		dilate(imgGreen, imgGreen, Mat(15, 15, CV_8UC1), Point(-1, -1));
+		erode(imgGreen, imgGreen, Mat(1, 1, CV_8UC1), Point(-1, -1));
+		redCount = processImgR(imgRed);
+		greenCount = processImgG(imgGreen);
+		cout << "red:" << redCount << ";  " << "green:" << greenCount << endl;
+		imshow("Origin", frame);
+		imshow("Red", imgRed);
+		imshow("Green", imgGreen);
+		// to exit the program (baand karta hai)
+		if (cvWaitKey(20) == 'q') break;
+	}return 0;}
+int processImgR(Mat src)
+{Mat tmp;
+	vector<vector<Point>> contours;// variable defined here
+	vector<Vec4i> hierarchy;
+	vector<Point> hull;
+	CvPoint2D32f tempNode;
+	CvMemStorage* storage = cvCreateMemStorage();
+	CvSeq* pointSeq = cvCreateSeq(CV_32FC2, sizeof(CvSeq), sizeof(CvPoint2D32f), storage);
+	Rect* trackBox;
+	Rect* result;
+	int resultNum = 0;
+	int area = 0;
+	src.copyTo(tmp);
+	// Extract the contour
+	findContours(tmp, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE);
+	if (contours.size() > 0)
+	{trackBox = new Rect[contours.size()];
+		result = new Rect[contours.size()];
+		// Determine the area to track
+		for (int i = 0; i < contours.size(); i++)
+		{cvClearSeq(pointSeq);
+			// Get the point set of the convex hull  //euclidean space
+			convexHull(Mat(contours[i]), hull, true);
+			int hullcount = (int)hull.size();
+			// Save points of the convex hull
+			for (int j = 0; j < hullcount - 1; j++)
+			{
+				tempNode.x = hull[j].x;
+				tempNode.y = hull[j].y;
+				cvSeqPush(pointSeq, &tempNode);
+			}
+	trackBox[i] = cvBoundingRect(pointSeq);
+		}
+	if (isFirstDetectedR)
+		{
+			lastTrackBoxR = new Rect[contours.size()];
+			for (int i = 0; i < contours.size(); i++)
+				lastTrackBoxR[i] = trackBox[i];
+			lastTrackNumR = contours.size();
+			isFirstDetectedR = false;
+		}	else
+		{
+			for (int i = 0; i < contours.size(); i++)
+			{
+				for (int j = 0; j < lastTrackNumR; j++)
+				{
+					if (isIntersected(trackBox[i], lastTrackBoxR[j]))
+					{
+						result[resultNum] = trackBox[i];break;
+					}}
+				resultNum++;
+			}
+			delete[] lastTrackBoxR;
+			lastTrackBoxR = new Rect[contours.size()];
+			for (int i = 0; i < contours.size(); i++)
+			{lastTrackBoxR[i] = trackBox[i];}
+			lastTrackNumR = contours.size();
+		}delete[] trackBox;
+	}
+	else
+	{
+		isFirstDetectedR = true;result = NULL;
+	}
+	cvReleaseMemStorage(&storage);
+	if (result != NULL)
+	{
+		for (int i = 0; i < resultNum; i++)
+		{
+			area += result[i].area();
+		}}delete[] result;
+	return area;
+}
+//(similarly for green light detection)
