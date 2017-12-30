@@ -1,0 +1,15 @@
+HOW TO DOWNLOAD OPEN CV???
+•	Download OpenCV 2.4 from http://opencv.org//.
+•	Extract OpenCV-2.4.7.exe to a folder let "C:/OpenCV". This OpenCV folder should contain many folders like build, include etc.
+Choose Visual Studio 15
+•	Right click on INSTALL. And choose Build
+•	After build successful, go back and choose Release. Similarly, right click on INSTALL. And choose Build.
+•	After build finish, close Visual Studio 2015
+
+•	On viewing the opened Visual Studio 2015 tool screen do the following: - 
+
+Step 1: Click on New Project option available at the left side which will open New project template where there are options to create various projects like Windows, Web, Mobile, Cloud Computing, WCF, Workflow etc. 
+
+Step 2: On the left side of New project window there are options to select language of the programming like C++, here selected language to create project is C++ and type of project is selected Windows using Console Application. 
+
+Step 3: Give a suitable name to the project and select the location to save the project on local drive.
